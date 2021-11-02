@@ -2,7 +2,7 @@
 #!/bin/bash
 
 path=docker
-config=mongo.conf
+config=mongod.conf
 ddd=0
 rs_p=0
 rs_arb=0
@@ -34,7 +34,7 @@ exit;;
 -d) path=$2;;
 -conf) config=$2;;
 -rs_add) rs_add=$2;;
--rs_arb) rs_arb=$2;;
+-rs_arb) rs_arb=1;;
 -rs_p) rs_p=1;;
 -subnet) subnet=$2;;
 -client) client=$2;;
@@ -65,9 +65,18 @@ if [ -z "$srv" ]; then
     exit
 fi
 
+if [ $rs_arb = 1 ] && [ -z "$rs_add" ]; then 
+    echo "parameter missing -rs_add"
+    exit
+fi
+
+if [ -n "$rs_add" ] && [ $rs_p = 0 ]; then 
+    echo "parameter missing -rs_add"
+    exit
+fi
+
 if [ -z "$rs_add" ] && [ $rs_p = 1 ]; then 
     rs_add=$srv
-    exit
 fi
 
 if [ $rs_p = 1 ] && [ -z "$ip" ]; then 
@@ -82,6 +91,21 @@ if [ $ddd = 1 ]; then
     sudo rm -r $path/$srv
     docker volume rm $srv
     # docker network rm mongo_rs
+fi
+
+if [ $rs_p = 1 ]; then
+
+    docker network create --subnet=$subnet mongo_rs
+
+    mkdir -m 777 -p docker/ssl
+
+    sudo chmod -R 777 docker/*
+
+    echo "корневой сертификат"
+    openssl genrsa -out $path/ssl/mongoCA.key 4096
+    openssl req -x509 -new -key $path/ssl/mongoCA.key -days 10000 -out $path/ssl/mongoCA.crt -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=mongoCA"
+    cat $path/ssl/mongoCA.key $path/ssl/mongoCA.crt > $path/ssl/mongoCA.pem
+    rm $path/ssl/mongoCA.key $path/ssl/mongoCA.crt
 fi
 
 echo -e "\ncreate dir $path/$srv\n"
@@ -106,10 +130,6 @@ sudo chmod -R 777 $path/$srv
 
 echo -e "\nbuilt image\n"
 docker build -t mongo_rs .
-
-if [ $net = 1 ]; then
-    docker network create --subnet=$subnet mongo_rs
-fi
 
 pwd_dir=`pwd`
 
@@ -144,7 +164,7 @@ if [ $rs_p = 1 ]; then
     --tlsCAFile /etc/ssl/mongoCA.pem \
     -u $user -p $pass \
     --quiet --eval "rs.initiate()"
-elif [ "$rs_add" ]; then
+elif [ -n "$rs_add" ] && [ $rs_arb = 0 ]; then
     sleep 5
     docker exec -it $rs_add mongosh \
     --tls \
@@ -158,7 +178,7 @@ elif [ "$rs_add" ]; then
     --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
     --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
     --quiet --eval "db.adminCommand({ 'setDefaultRWConcern': 1, 'defaultWriteConcern': { 'w': 1 } })"
-elif [ "$rs_add" ]; then
+elif [ $rs_arb = 1 ]; then
     sleep 5
     docker exec -it $rs_add mongosh \
     --tls \
