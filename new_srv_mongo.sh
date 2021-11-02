@@ -25,6 +25,7 @@ echo -e "-rs_add\t\tname primary srv to add server"
 echo -e "-rs_arb\t\tadd arbiter to -rs_add"
 echo -e "-ip\t\tfrom srv: any static unoccupied ip address in the range of mongo_rs (defaut $subnet)"
 echo -e "-client\t\tip client (the CA file must exist to docker/ssl)"
+# echo -e "-ca\t\tcreate ca file"
 echo -e "-u\t\tuser name (defaut \"root\")"
 echo -e "-p\t\tpassword (defaut \"root\")"
 echo ""
@@ -39,6 +40,7 @@ exit;;
 -subnet) subnet=$2;;
 -client) client=$2;;
 -ip) ip=$2;;
+# -CA) CA=$2;;
 -u) user=$2;;
 -p) pass=$2;;
 esac
@@ -52,7 +54,15 @@ if [ -n "$client" ]; then
     openssl x509 -req -in $path/ssl/$client.csr -CA $path/ssl/mongoCA.pem -CAcreateserial -out $path/ssl/$client.crt -days 365
     cat $path/ssl/$client.key $path/ssl/$client.crt > $path/ssl/$client.pem
     rm $path/ssl/$client.key $path/ssl/$client.crt $path/ssl/$client.csr 
-    exit
+fi
+
+if [ $ddd = 1 ]; then 
+    echo -e "\ndeleted old\n"
+    docker stop $srv
+    docker rm $srv
+    sudo rm -r $path/$srv
+    docker volume rm $srv
+    # docker network rm mongo_rs
 fi
 
 if [ -z "$ip" ]; then 
@@ -82,15 +92,6 @@ fi
 if [ $rs_p = 1 ] && [ -z "$ip" ]; then 
     echo "parameter missing -ip"
     exit
-fi
-
-if [ $ddd = 1 ]; then 
-    echo -e "\ndeleted old\n"
-    docker stop $srv
-    docker rm $srv
-    sudo rm -r $path/$srv
-    docker volume rm $srv
-    # docker network rm mongo_rs
 fi
 
 if [ $rs_p = 1 ]; then
