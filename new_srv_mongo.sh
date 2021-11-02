@@ -185,5 +185,5 @@ elif [ $rs_arb = 1 ]; then
     --host $rs_add \
     --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
     --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
-    --quiet --eval "rs.addArb({'$srv:27017'})"
+    --quiet --eval "rs.addArb('$srv:27017')"
 fi
