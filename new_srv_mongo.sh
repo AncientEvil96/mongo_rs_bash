@@ -70,7 +70,7 @@ if [ $rs_arb = 1 ] && [ -z "$rs_add" ]; then
     exit
 fi
 
-if [ -n "$rs_add" ] && [ $rs_p = 0 ]; then 
+if [ -z "$rs_add" ] && [ $rs_p = 0 ]; then 
     echo "parameter missing -rs_add"
     exit
 fi
@@ -171,7 +171,7 @@ elif [ -n "$rs_add" ] && [ $rs_arb = 0 ]; then
     --host $rs_add \
     --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
     --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
-    --quiet --eval "rs.add({'$srv:27017'})"
+    --quiet --eval "rs.add('$srv:27017')"
     docker exec -it $rs_add mongosh \
     --tls \
     --host $rs_add \
