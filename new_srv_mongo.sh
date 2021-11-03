@@ -6,6 +6,7 @@ config=mongod.conf
 ddd=0
 rs_p=0
 rs_arb=0
+ca=0
 subnet=172.16.238.0/24
 user=root
 pass=root
@@ -25,7 +26,7 @@ echo -e "-rs_add\t\tname primary srv to add server"
 echo -e "-rs_arb\t\tadd arbiter to -rs_add"
 echo -e "-ip\t\tfrom srv: any static unoccupied ip address in the range of mongo_rs (defaut $subnet)"
 echo -e "-client\t\tip client (the CA file must exist to docker/ssl)"
-# echo -e "-ca\t\tcreate ca file"
+echo -e "-ca\t\tcreate ca file"
 echo -e "-u\t\tuser name (defaut \"root\")"
 echo -e "-p\t\tpassword (defaut \"root\")"
 echo ""
@@ -40,7 +41,7 @@ exit;;
 -subnet) subnet=$2;;
 -client) client=$2;;
 -ip) ip=$2;;
-# -CA) CA=$2;;
+-ca) ca=1;;
 -u) user=$2;;
 -p) pass=$2;;
 esac
@@ -64,6 +65,19 @@ if [ $ddd = 1 ]; then
     docker volume rm $srv
     # docker network rm mongo_rs
 fi
+
+# if [ $ca = 1 ]; then
+
+#     mkdir -m 777 -p docker/ssl
+
+#     sudo chmod -R 777 docker/*
+
+#     echo "корневой сертификат"
+#     openssl genrsa -out $path/ssl/mongoCA.key 4096
+#     openssl req -x509 -new -key $path/ssl/mongoCA.key -days 10000 -out $path/ssl/mongoCA.crt -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=mongoCA"
+#     cat $path/ssl/mongoCA.key $path/ssl/mongoCA.crt > $path/ssl/mongoCA.pem
+#     rm $path/ssl/mongoCA.key $path/ssl/mongoCA.crt
+# fi
 
 if [ -z "$ip" ]; then 
     echo "parameter missing -ip"
@@ -106,7 +120,7 @@ if [ $rs_p = 1 ]; then
     openssl genrsa -out $path/ssl/mongoCA.key 4096
     openssl req -x509 -new -key $path/ssl/mongoCA.key -days 10000 -out $path/ssl/mongoCA.crt -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=mongoCA"
     cat $path/ssl/mongoCA.key $path/ssl/mongoCA.crt > $path/ssl/mongoCA.pem
-    rm $path/ssl/mongoCA.key $path/ssl/mongoCA.crt
+    rm $path/ssl/mongoCA.key $path/ssl/mongoCA.crt $path/ssl/mongoCA.srl 
 fi
 
 echo -e "\ncreate dir $path/$srv\n"
@@ -140,8 +154,8 @@ docker run -d \
 --network mongo_rs \
 --name $srv \
 --restart=always \
---env MONGO_INITDB_ROOT_USERNAME=root \
---env MONGO_INITDB_ROOT_PASSWORD=root \
+--env MONGO_INITDB_ROOT_USERNAME=$user \
+--env MONGO_INITDB_ROOT_PASSWORD=$pass \
 -v $pwd_dir/$path/$srv/mongod.conf:/etc/mongod.conf:rw \
 -v $pwd_dir/$path/ssl/:/etc/ssl:rw \
 -v $pwd_dir/$path/$srv/var/lib/:/var/lib/mongodb \
@@ -151,13 +165,13 @@ mongod --config /etc/mongod.conf
 
 sed -i 's/# //g' $path/$srv/mongod.conf
 
-sleep 2
+sleep 5
 
 echo "restart"
 docker restart $srv
 
 if [ $rs_p = 1 ]; then
-    sleep 5
+    sleep 10
     docker exec -it $rs_add mongosh \
     --tls \
     --host $rs_add \
@@ -165,22 +179,22 @@ if [ $rs_p = 1 ]; then
     --tlsCAFile /etc/ssl/mongoCA.pem \
     -u $user -p $pass \
     --quiet --eval "rs.initiate()"
+     docker exec -it $rs_add mongosh \
+    --tls \
+    --host $rs_add \
+    --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
+    --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
+    --quiet --eval "db.adminCommand({ 'setDefaultRWConcern': 1, 'defaultWriteConcern': { 'w': 1 } })"
 elif [ -n "$rs_add" ] && [ $rs_arb = 0 ]; then
-    sleep 5
+    sleep 10
     docker exec -it $rs_add mongosh \
     --tls \
     --host $rs_add \
     --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
     --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
     --quiet --eval "rs.add('$srv:27017')"
-    docker exec -it $rs_add mongosh \
-    --tls \
-    --host $rs_add \
-    --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
-    --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
-    --quiet --eval "db.adminCommand({ 'setDefaultRWConcern': 1, 'defaultWriteConcern': { 'w': 1 } })"
 elif [ $rs_arb = 1 ]; then
-    sleep 5
+    sleep 10
     docker exec -it $rs_add mongosh \
     --tls \
     --host $rs_add \
