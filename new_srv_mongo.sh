@@ -10,6 +10,7 @@ ca=0
 subnet=172.16.238.0/24
 user=root
 pass=root
+port=27017
 
 
 while [ -n "$1" ]
@@ -24,6 +25,7 @@ echo -e "-conf\t\tmongod.conf full or relative path if the file is not in the ro
 echo -e "-rs_p\t\tinitiate replicaSet"
 echo -e "-rs_add\t\tname primary srv to add server"
 echo -e "-rs_arb\t\tadd arbiter to -rs_add"
+echo -e "-port\t\tport (defaut \"$port)\""
 echo -e "-ip\t\tfrom srv: any static unoccupied ip address in the range of mongo_rs (defaut $subnet)"
 echo -e "-client\t\tip client (the CA file must exist to docker/ssl)"
 echo -e "-ca\t\tcreate ca file"
@@ -38,10 +40,12 @@ exit;;
 -rs_add) rs_add=$2;;
 -rs_arb) rs_arb=1;;
 -rs_p) rs_p=1;;
+-port) port=$2;;
+-ip) ip=$2;;
 -subnet) subnet=$2;;
 -client) client=$2;;
--ip) ip=$2;;
 -ca) ca=1;;
+-ip_srv) ip_srv=$2;;
 -u) user=$2;;
 -p) pass=$2;;
 esac
@@ -128,7 +132,7 @@ mkdir -m 777 -p $path/$srv
 
 echo -e "\ncreate pem from srv $path/ssl\n"
 openssl genrsa -out $path/ssl/$srv.key 4096
-openssl req -new -key $path/ssl/$srv.key -out $path/ssl/$srv.csr -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=$srv"
+openssl req -new -key $path/ssl/$srv.key -out $path/ssl/$srv.csr -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=$ip_srv"
 openssl x509 -req -in $path/ssl/$srv.csr -CA $path/ssl/mongoCA.pem -CAcreateserial -out $path/ssl/$srv.crt -days 10000
 cat $path/ssl/$srv.key $path/ssl/$srv.crt > $path/ssl/$srv.pem
 rm $path/ssl/$srv.key $path/ssl/$srv.crt $path/ssl/$srv.csr
@@ -151,6 +155,7 @@ pwd_dir=`pwd`
 docker run -d \
 --hostname $srv \
 --ip $ip \
+-p $port:27017 \
 --network mongo_rs \
 --name $srv \
 --restart=always \
@@ -192,7 +197,7 @@ elif [ -n "$rs_add" ] && [ $rs_arb = 0 ]; then
     --host $rs_add \
     --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
     --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
-    --quiet --eval "rs.add('$srv:27017')"
+    --quiet --eval "rs.add('$ip_srv:$port')"
 elif [ $rs_arb = 1 ]; then
     sleep 10
     docker exec -it $rs_add mongosh \
@@ -200,5 +205,5 @@ elif [ $rs_arb = 1 ]; then
     --host $rs_add \
     --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
     --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
-    --quiet --eval "rs.addArb('$srv:27017')"
+    --quiet --eval "rs.addArb('$ip_srv:$port')"
 fi
