@@ -45,7 +45,6 @@ exit;;
 -subnet) subnet=$2;;
 -client) client=$2;;
 -ca) ca=1;;
--ip_srv) ip_srv=$2;;
 -u) user=$2;;
 -p) pass=$2;;
 esac
@@ -81,6 +80,7 @@ fi
 #     openssl req -x509 -new -key $path/ssl/mongoCA.key -days 10000 -out $path/ssl/mongoCA.crt -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=mongoCA"
 #     cat $path/ssl/mongoCA.key $path/ssl/mongoCA.crt > $path/ssl/mongoCA.pem
 #     rm $path/ssl/mongoCA.key $path/ssl/mongoCA.crt
+
 # fi
 
 if [ -z "$ip" ]; then 
@@ -124,7 +124,8 @@ if [ $rs_p = 1 ]; then
     openssl genrsa -out $path/ssl/mongoCA.key 4096
     openssl req -x509 -new -key $path/ssl/mongoCA.key -days 10000 -out $path/ssl/mongoCA.crt -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=mongoCA"
     cat $path/ssl/mongoCA.key $path/ssl/mongoCA.crt > $path/ssl/mongoCA.pem
-    rm $path/ssl/mongoCA.key $path/ssl/mongoCA.crt $path/ssl/mongoCA.srl 
+    rm $path/ssl/mongoCA.key $path/ssl/mongoCA.crt $path/ssl/mongoCA.srl
+
 fi
 
 echo -e "\ncreate dir $path/$srv\n"
@@ -132,7 +133,7 @@ mkdir -m 777 -p $path/$srv
 
 echo -e "\ncreate pem from srv $path/ssl\n"
 openssl genrsa -out $path/ssl/$srv.key 4096
-openssl req -new -key $path/ssl/$srv.key -out $path/ssl/$srv.csr -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=$ip_srv"
+openssl req -new -key $path/ssl/$srv.key -out $path/ssl/$srv.csr -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=$srv"
 openssl x509 -req -in $path/ssl/$srv.csr -CA $path/ssl/mongoCA.pem -CAcreateserial -out $path/ssl/$srv.crt -days 10000
 cat $path/ssl/$srv.key $path/ssl/$srv.crt > $path/ssl/$srv.pem
 rm $path/ssl/$srv.key $path/ssl/$srv.crt $path/ssl/$srv.csr
@@ -176,6 +177,7 @@ echo "restart"
 docker restart $srv
 
 if [ $rs_p = 1 ]; then
+    
     sleep 10
     docker exec -it $rs_add mongosh \
     --tls \
@@ -191,13 +193,14 @@ if [ $rs_p = 1 ]; then
     --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
     --quiet --eval "db.adminCommand({ 'setDefaultRWConcern': 1, 'defaultWriteConcern': { 'w': 1 } })"
 elif [ -n "$rs_add" ] && [ $rs_arb = 0 ]; then
+    
     sleep 10
     docker exec -it $rs_add mongosh \
     --tls \
     --host $rs_add \
     --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
     --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
-    --quiet --eval "rs.add('$ip_srv:$port')"
+    --quiet --eval "rs.add('$srv:$port')"
 elif [ $rs_arb = 1 ]; then
     sleep 10
     docker exec -it $rs_add mongosh \
@@ -205,5 +208,5 @@ elif [ $rs_arb = 1 ]; then
     --host $rs_add \
     --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
     --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
-    --quiet --eval "rs.addArb('$ip_srv:$port')"
+    --quiet --eval "rs.addArb('$srv:$port')"
 fi
