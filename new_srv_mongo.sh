@@ -11,6 +11,7 @@ subnet=172.16.238.0/24
 user=root
 pass=root
 port=27017
+net=0
 
 
 while [ -n "$1" ]
@@ -34,6 +35,9 @@ echo -e "-p\t\tpassword (defaut \"root\")"
 echo ""
 exit;;
 -rm) ddd=1;;
+-host) host=$2;;
+-port) port=$2;;
+-net) net=1;;
 -new_srv) srv=$2;;
 -d) path=$2;;
 -conf) config=$2;;
@@ -69,19 +73,21 @@ if [ $ddd = 1 ]; then
     # docker network rm mongo_rs
 fi
 
-# if [ $ca = 1 ]; then
+if [ $ca = 1 ]; then
 
-#     mkdir -m 777 -p docker/ssl
+    mkdir -m 777 -p docker/ssl
 
-#     sudo chmod -R 777 docker/*
+    sudo chmod -R 777 docker/*
 
-#     echo "корневой сертификат"
-#     openssl genrsa -out $path/ssl/mongoCA.key 4096
-#     openssl req -x509 -new -key $path/ssl/mongoCA.key -days 10000 -out $path/ssl/mongoCA.crt -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=mongoCA"
-#     cat $path/ssl/mongoCA.key $path/ssl/mongoCA.crt > $path/ssl/mongoCA.pem
-#     rm $path/ssl/mongoCA.key $path/ssl/mongoCA.crt
+    echo "корневой сертификат"
+    openssl genrsa -out $path/ssl/mongoCA.key 4096
+    openssl req -x509 -new -key $path/ssl/mongoCA.key -days 10000 -out $path/ssl/mongoCA.crt -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=mongoCA"
+    cat $path/ssl/mongoCA.key $path/ssl/mongoCA.crt > $path/ssl/mongoCA.pem
+    rm $path/ssl/mongoCA.key $path/ssl/mongoCA.crt
 
-# fi
+else
+    mv mongoCA.pem $path/ssl/
+fi
 
 if [ -z "$ip" ]; then 
     echo "parameter missing -ip"
@@ -93,15 +99,15 @@ if [ -z "$srv" ]; then
     exit
 fi
 
-if [ $rs_arb = 1 ] && [ -z "$rs_add" ]; then 
-    echo "parameter missing -rs_add"
-    exit
-fi
+# if [ $rs_arb = 1 ] && [ -z "$rs_add" ]; then 
+#     echo "parameter missing -rs_add"
+#     exit
+# fi
 
-if [ -z "$rs_add" ] && [ $rs_p = 0 ]; then 
-    echo "parameter missing -rs_add"
-    exit
-fi
+# if [ -z "$rs_add" ] && [ $rs_p = 0 ]; then 
+#     echo "parameter missing -rs_add"
+#     exit
+# fi
 
 if [ -z "$rs_add" ] && [ $rs_p = 1 ]; then 
     rs_add=$srv
@@ -112,21 +118,25 @@ if [ $rs_p = 1 ] && [ -z "$ip" ]; then
     exit
 fi
 
-if [ $rs_p = 1 ]; then
-
-    docker network create --subnet=$subnet mongo_rs
-
-    mkdir -m 777 -p docker/ssl
-
-    sudo chmod -R 777 docker/*
-
-    echo "корневой сертификат"
-    openssl genrsa -out $path/ssl/mongoCA.key 4096
-    openssl req -x509 -new -key $path/ssl/mongoCA.key -days 10000 -out $path/ssl/mongoCA.crt -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=mongoCA"
-    cat $path/ssl/mongoCA.key $path/ssl/mongoCA.crt > $path/ssl/mongoCA.pem
-    rm $path/ssl/mongoCA.key $path/ssl/mongoCA.crt $path/ssl/mongoCA.srl
-
+if [ $net = 1 ]; then
+    docker network create --subnet=$subnet mongo_rs  
 fi
+
+# if [ $rs_p = 1 ]; then
+
+#     docker network create --subnet=$subnet mongo_rs
+
+#     mkdir -m 777 -p docker/ssl
+
+#     sudo chmod -R 777 docker/*
+
+#     # echo "корневой сертификат"
+#     # openssl genrsa -out $path/ssl/mongoCA.key 4096
+#     # openssl req -x509 -new -key $path/ssl/mongoCA.key -days 10000 -out $path/ssl/mongoCA.crt -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=mongoCA"
+#     # cat $path/ssl/mongoCA.key $path/ssl/mongoCA.crt > $path/ssl/mongoCA.pem
+#     # rm $path/ssl/mongoCA.key $path/ssl/mongoCA.crt $path/ssl/mongoCA.srl
+
+# fi
 
 echo -e "\ncreate dir $path/$srv\n"
 mkdir -m 777 -p $path/$srv
@@ -192,7 +202,10 @@ if [ $rs_p = 1 ]; then
     --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
     --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
     --quiet --eval "db.adminCommand({ 'setDefaultRWConcern': 1, 'defaultWriteConcern': { 'w': 1 } })"
-elif [ -n "$rs_add" ] && [ $rs_arb = 0 ]; then
+    exit
+fi
+
+if [ -n "$rs_add" ] && [ $rs_arb = 0 ]; then
     
     sleep 10
     docker exec -it $rs_add mongosh \
@@ -202,6 +215,7 @@ elif [ -n "$rs_add" ] && [ $rs_arb = 0 ]; then
     --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
     --quiet --eval "rs.add('$srv:$port')"
 elif [ $rs_arb = 1 ]; then
+    
     sleep 10
     docker exec -it $rs_add mongosh \
     --tls \
