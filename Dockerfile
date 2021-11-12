@@ -55,11 +55,11 @@ RUN useradd -m mongouser && \
     adduser mongouser sudo && \
     echo "mongouser     ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers 
 
-RUN echo 192.168.2.172  mongo_rs_0 >> /etc/hosts && \
-    echo 172.16.238.2   mongo_rs_1 >> /etc/hosts && \
-    echo 172.16.238.3   mongo_rs_arb_1 >> /etc/hosts && \
-    echo 192.168.2.175  mongo_rs_1 mongo_rs_arb_1 >> /etc/hosts && \
-    echo 192.168.2.178  mongo_rs_2 mongo_rs_arb_2 >> /etc/hosts
+RUN echo -e "192.168.2.172\tmongo_rs_0" >> /etc/hosts && \
+    echo -e "172.16.238.2\tmongo_rs_1" >> /etc/hosts && \
+    echo -e "172.16.238.3\tmongo_rs_arb_1" >> /etc/hosts && \
+    echo -e "192.168.2.175\tmongo_rs_1 mongo_rs_arb_1" >> /etc/hosts && \
+    echo -e "192.168.2.178\tmongo_rs_2 mongo_rs_arb_2" >> /etc/hosts
 
 # RUN mkdir /home/mongouser
 # RUN touch /home/mongouser/mongod/mongod.conf
