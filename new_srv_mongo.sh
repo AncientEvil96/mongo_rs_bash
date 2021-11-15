@@ -73,6 +73,10 @@ if [ $ddd = 1 ]; then
     # docker network rm mongo_rs
 fi
 
+if [ $net = 1 ]; then
+    docker network create --subnet=$subnet mongo_rs  
+fi
+
 if [ $ca = 1 ]; then
 
     mkdir -m 777 -p docker/ssl
@@ -87,6 +91,28 @@ if [ $ca = 1 ]; then
 
 else
     mv mongoCA.pem $path/ssl/
+fi
+
+if [ -n "$rs_add" ] && [ $rs_arb = 0 ]; then
+    
+    sleep 10
+    docker exec -it $rs_add mongosh \
+    --tls \
+    --host $rs_add \
+    --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
+    --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
+    --quiet --eval "rs.add('$srv:$port')"
+    exit
+elif [ $rs_arb = 1 ]; then
+    
+    sleep 10
+    docker exec -it $rs_add mongosh \
+    --tls \
+    --host $rs_add \
+    --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
+    --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
+    --quiet --eval "rs.addArb('$srv:$port')"
+    exit
 fi
 
 if [ -z "$ip" ]; then 
@@ -109,7 +135,7 @@ fi
 #     exit
 # fi
 
-if [ -z "$rs_add" ] && [ $rs_p = 1 ]; then 
+if [ $rs_p = 1 ]; then 
     rs_add=$srv
 fi
 
@@ -121,22 +147,6 @@ fi
 if [ $net = 1 ]; then
     docker network create --subnet=$subnet mongo_rs  
 fi
-
-# if [ $rs_p = 1 ]; then
-
-#     docker network create --subnet=$subnet mongo_rs
-
-#     mkdir -m 777 -p docker/ssl
-
-#     sudo chmod -R 777 docker/*
-
-#     # echo "корневой сертификат"
-#     # openssl genrsa -out $path/ssl/mongoCA.key 4096
-#     # openssl req -x509 -new -key $path/ssl/mongoCA.key -days 10000 -out $path/ssl/mongoCA.crt -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=mongoCA"
-#     # cat $path/ssl/mongoCA.key $path/ssl/mongoCA.crt > $path/ssl/mongoCA.pem
-#     # rm $path/ssl/mongoCA.key $path/ssl/mongoCA.crt $path/ssl/mongoCA.srl
-
-# fi
 
 echo -e "\ncreate dir $path/$srv\n"
 mkdir -m 777 -p $path/$srv
@@ -203,24 +213,4 @@ if [ $rs_p = 1 ]; then
     --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
     --quiet --eval "db.adminCommand({ 'setDefaultRWConcern': 1, 'defaultWriteConcern': { 'w': 1 } })"
     exit
-fi
-
-if [ -n "$rs_add" ] && [ $rs_arb = 0 ]; then
-    
-    sleep 10
-    docker exec -it $rs_add mongosh \
-    --tls \
-    --host $rs_add \
-    --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
-    --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
-    --quiet --eval "rs.add('$srv:$port')"
-elif [ $rs_arb = 1 ]; then
-    
-    sleep 10
-    docker exec -it $rs_add mongosh \
-    --tls \
-    --host $rs_add \
-    --tlsCertificateKeyFile /etc/ssl/$rs_add.pem \
-    --tlsCAFile /etc/ssl/mongoCA.pem -u $user -p $pass \
-    --quiet --eval "rs.addArb('$srv:$port')"
 fi
