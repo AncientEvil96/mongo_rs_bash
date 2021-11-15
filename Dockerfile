@@ -24,6 +24,7 @@ RUN apt-get update -y && \
     curl \
     iputils-ping \ 
     net-tools \
+    # nmap \
     mongodb-mongosh 
     # systemd
 

@@ -77,11 +77,10 @@ if [ $net = 1 ]; then
     docker network create --subnet=$subnet mongo_rs  
 fi
 
+echo -e "\ncreate dir $path/$srv\n"
+mkdir -m 777 -p $path/$srv
+
 if [ $ca = 1 ]; then
-
-    mkdir -m 777 -p docker/ssl
-
-    sudo chmod -R 777 docker/*
 
     echo "корневой сертификат"
     openssl genrsa -out $path/ssl/mongoCA.key 4096
@@ -148,9 +147,6 @@ if [ $net = 1 ]; then
     docker network create --subnet=$subnet mongo_rs  
 fi
 
-echo -e "\ncreate dir $path/$srv\n"
-mkdir -m 777 -p $path/$srv
-
 echo -e "\ncreate pem from srv $path/ssl\n"
 openssl genrsa -out $path/ssl/$srv.key 4096
 openssl req -new -key $path/ssl/$srv.key -out $path/ssl/$srv.csr -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=$srv"
@@ -206,6 +202,9 @@ if [ $rs_p = 1 ]; then
     --tlsCAFile /etc/ssl/mongoCA.pem \
     -u $user -p $pass \
     --quiet --eval "rs.initiate()"
+
+    sleep 5
+    
      docker exec -it $rs_add mongosh \
     --tls \
     --host $rs_add \
