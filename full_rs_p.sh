@@ -37,7 +37,7 @@ if [ $add = 1]; then
         --host mongo_rs_0 \
         --tlsCertificateKeyFile /etc/ssl/mongo_rs_0.pem \
         --tlsCAFile /etc/ssl/mongoCA.pem -u root -p root \
-        --quiet --eval "rs.add('mongo_rs_1:27001')"
+        --quiet --eval "rs.add('mongo_rs_1')"
     docker exec -it mongo_rs_0 mongosh \
         --tls \
         --host mongo_rs_0 \

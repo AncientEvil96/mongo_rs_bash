@@ -12,6 +12,8 @@ user=root
 pass=root
 port=27017
 net=0
+build=0
+
 
 
 while [ -n "$1" ]
@@ -48,6 +50,7 @@ exit;;
 -ip) ip=$2;;
 -subnet) subnet=$2;;
 -client) client=$2;;
+-build) build=1;;
 -ca) ca=1;;
 -u) user=$2;;
 -p) pass=$2;;
@@ -55,13 +58,9 @@ esac
 shift
 done
 
-if [ -n "$client" ]; then 
-    echo -e "\ncreate pem from client $path/ssl\n"
-    openssl genrsa -out $path/ssl/$client.key 4096
-    openssl req -new -key $path/ssl/$client.key -out $path/ssl/$client.csr -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=$client"
-    openssl x509 -req -in $path/ssl/$client.csr -CA $path/ssl/mongoCA.pem -CAcreateserial -out $path/ssl/$client.crt -days 365
-    cat $path/ssl/$client.key $path/ssl/$client.crt > $path/ssl/$client.pem
-    rm $path/ssl/$client.key $path/ssl/$client.crt $path/ssl/$client.csr 
+if [ -n "$build" ]; then 
+    echo -e "\nbuilt image\n"
+    docker build -t mongo_rs .
 fi
 
 if [ $ddd = 1 ]; then 
@@ -73,23 +72,34 @@ if [ $ddd = 1 ]; then
     # docker network rm mongo_rs
 fi
 
-if [ $net = 1 ]; then
-    docker network create --subnet=$subnet mongo_rs  
-fi
-
 echo -e "\ncreate dir $path/$srv\n"
-mkdir -m 777 -p $path/$srv
+sudo mkdir -m 777 -p $path/$srv
+sudo chmod -R 777 $path/*
+
+if [ $net = 1 ]; then
+    docker network create --subnet=$subnet mongo_rs
+fi
 
 if [ $ca = 1 ]; then
 
     echo "корневой сертификат"
-    openssl genrsa -out $path/ssl/mongoCA.key 4096
-    openssl req -x509 -new -key $path/ssl/mongoCA.key -days 10000 -out $path/ssl/mongoCA.crt -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=mongoCA"
+    sudo openssl genrsa -out $path/ssl/mongoCA.key 4096
+    sudo openssl req -x509 -new -key $path/ssl/mongoCA.key -days 10000 -out $path/ssl/mongoCA.crt -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=mongoCA"
     cat $path/ssl/mongoCA.key $path/ssl/mongoCA.crt > $path/ssl/mongoCA.pem
-    rm $path/ssl/mongoCA.key $path/ssl/mongoCA.crt
+    sudo rm $path/ssl/mongoCA.key $path/ssl/mongoCA.crt
 
 else
-    mv mongoCA.pem $path/ssl/
+    echo "копируем сертификат"
+    sudo cp mongoCA.pem $path/ssl/
+fi
+
+if [ -n "$client" ]; then 
+    echo -e "\ncreate pem from client $path/ssl\n"
+    sudo openssl genrsa -out $path/ssl/$client.key 4096
+    sudo openssl req -new -key $path/ssl/$client.key -out $path/ssl/$client.csr -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=$client"
+    sudo openssl x509 -req -in $path/ssl/$client.csr -CA $path/ssl/mongoCA.pem -CAcreateserial -out $path/ssl/$client.crt -days 365
+    cat $path/ssl/$client.key $path/ssl/$client.crt > $path/ssl/$client.pem
+    sudo rm $path/ssl/$client.key $path/ssl/$client.crt $path/ssl/$client.csr
 fi
 
 if [ -n "$rs_add" ] && [ $rs_arb = 0 ]; then
@@ -144,35 +154,24 @@ if [ $rs_p = 1 ] && [ -z "$ip" ]; then
 fi
 
 if [ $net = 1 ]; then
-    docker network create --subnet=$subnet mongo_rs  
+    docker network create --subnet=$subnet mongo_rs
 fi
 
-echo -e "\ncreate pem from srv $path/ssl\n"
-openssl genrsa -out $path/ssl/$srv.key 4096
-openssl req -new -key $path/ssl/$srv.key -out $path/ssl/$srv.csr -subj "/C=RU/ST=RT/L=NCH/O=VPROK/OU=IT/CN=$srv"
-openssl x509 -req -in $path/ssl/$srv.csr -CA $path/ssl/mongoCA.pem -CAcreateserial -out $path/ssl/$srv.crt -days 10000
-cat $path/ssl/$srv.key $path/ssl/$srv.crt > $path/ssl/$srv.pem
-rm $path/ssl/$srv.key $path/ssl/$srv.crt $path/ssl/$srv.csr
-
 echo -e "\ncreate dir $path/$srv/var/lib + $path/$srv/var/log\n"
-mkdir -m 777 -p $path/$srv/var/lib
-mkdir -m 777 -p $path/$srv/var/log
+sudo mkdir -m 777 -p $path/$srv/var/lib
+sudo mkdir -m 777 -p $path/$srv/var/log
 
 echo -e "\ncopy config $config\n"
 cat $config > $path/$srv/mongod.conf
-sed -i "s/mongo1.pem/$srv.pem/g" $path/$srv/mongod.conf
+sudo sed -i "s/mongo1.pem/$srv.pem/g" $path/$srv/mongod.conf
 
 sudo chmod -R 777 $path/$srv
-
-echo -e "\nbuilt image\n"
-docker build -t mongo_rs .
 
 pwd_dir=`pwd`
 
 docker run -d \
 --hostname $srv \
 --ip $ip \
--p $port:27017 \
 --network mongo_rs \
 --name $srv \
 --restart=always \
@@ -185,7 +184,7 @@ docker run -d \
 mongo_rs \
 mongod --config /etc/mongod.conf
 
-sed -i 's/# //g' $path/$srv/mongod.conf
+sudo sed -i 's/# //g' $path/$srv/mongod.conf
 
 sleep 5
 
