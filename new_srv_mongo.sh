@@ -58,8 +58,8 @@ esac
 shift
 done
 
-if [ -n "$build" ]; then 
-    echo -e "\nbuilt image\n"
+if [ $build = 1 ]; then 
+    echo -e "\nbuild image\n"
     docker build -t mongo_rs .
 fi
 
@@ -74,7 +74,7 @@ fi
 
 echo -e "\ncreate dir $path/$srv\n"
 sudo mkdir -m 777 -p $path/$srv
-sudo chmod -R 777 $path/*
+sudo chmod -R 777 $path/ssl
 
 if [ $net = 1 ]; then
     docker network create --subnet=$subnet mongo_rs
@@ -172,6 +172,7 @@ pwd_dir=`pwd`
 docker run -d \
 --hostname $srv \
 --ip $ip \
+-p $port:27017 \
 --network mongo_rs \
 --name $srv \
 --restart=always \

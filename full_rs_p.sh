@@ -20,7 +20,7 @@ done
 bash new_srv_mongo.sh -rm -new_srv mongo_rs_0 -rs_p -ip 172.16.238.2 -net
 
 if [ $add = 1]; then
-    docker exec -it mongo_rs_0 mongosh \
+    docker exec -it mongo_rs_1 mongosh \
         --tls \
         --host mongo_rs_0 \
         --tlsCertificateKeyFile /etc/ssl/mongo_rs_0.pem \
